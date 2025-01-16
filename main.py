@@ -6,9 +6,6 @@ from collections import defaultdict
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
 
-# -------------------------------------------------
-# Configuration
-# -------------------------------------------------
 LANGUAGE = "english"  # or "french", etc.
 STOPWORDS = set(stopwords.words(LANGUAGE))
 STEMMER = SnowballStemmer(LANGUAGE)
@@ -156,8 +153,8 @@ def build_weighted_index(inverted_index, total_docs, tf_scheme='n', idf_scheme='
         idf_value = compute_idf(idf_scheme, df, total_docs)
 
         for doc_id, tf in postings.items():
-            tf_idf_value = tf * idf  # Rename this variable to avoid overwriting the dictionary
-            tf_idf_index[term][doc_id] = tf_idf_value
+            tf_idf_value = tf * idf_value
+            weighted_index[term][doc_id] = tf_idf_value
             doc_vectors[doc_id][term] = tf_idf_value
 
     return weighted_index, doc_vectors
@@ -230,7 +227,6 @@ def get_similarity_function(sim_name):
         return similarity_jaccard
     elif sim_name == 'dice':
         return similarity_dice
-    # default: cosine
     return similarity_cosine
 
 # -------------------------------------------------
