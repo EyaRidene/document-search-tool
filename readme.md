@@ -1,31 +1,39 @@
-# README – Basic TF-IDF Search Engine in Python
+# README – Enhanced TF-IDF Search Engine in Python
 
-This project demonstrates a **simple information retrieval system** using Python and NLTK (Natural Language Toolkit). It does the following:
+This project demonstrates a **simple yet more configurable information retrieval system** using Python and NLTK. It provides:
 
-1. Loads and scans `.txt` files from a specified directory.
-2. Preprocesses text (tokenization, stopword removal, stemming).
-3. Builds an **inverted index** that maps each term to the documents in which it appears.
-4. Computes **TF-IDF** weights for each term–document pair.
-5. Performs **cosine similarity**–based ranking of documents given a user query.
+1. **Multiple TF-IDF weighting schemes** (binary, raw, log).  
+2. **Multiple IDF schemes** (none, standard, probabilistic).  
+3. **Multiple similarity measures** (cosine, Jaccard, Dice).  
+4. **Flexible search** with a command-line interface (CLI) specifying TF, IDF, similarity, and number of top results.  
+5. **Evaluation** through precision/recall, F1, and P@K metrics (with user-defined relevant documents).
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Project Structure](#project-structure)
-3. [How It Works](#how-it-works)
-   1. [1. Reading Documents](#1-reading-documents)
-   2. [2. Preprocessing](#2-preprocessing)
-   3. [3. Building the Inverted Index](#3-building-the-inverted-index)
-   4. [4. Computing TF-IDF](#4-computing-tf-idf)
-   5. [5. Cosine Similarity and Searching](#5-cosine-similarity-and-searching)
-   6. [6. Main Demo](#6-main-demo)
-4. [Usage](#usage)
-5. [Customization](#customization)
-6. [Possible Improvements](#possible-improvements)
+1. [Prerequisites](#prerequisites)  
+2. [Project Structure](#project-structure)  
+3. [How It Works](#how-it-works)  
+   1. [Reading Documents](#reading-documents)  
+   2. [Preprocessing](#preprocessing)  
+   3. [Building the Inverted Index](#building-the-inverted-index)  
+   4. [Weighting and Building Vectors (TF–IDF)](#weighting-and-building-vectors-tfidf)  
+   5. [Similarity and Searching](#similarity-and-searching)  
+   6. [Evaluation](#evaluation)  
+4. [Usage](#usage)  
+5. [Customization](#customization)  
+6. [Possible Improvements](#possible-improvements)  
 7. [License](#license)
 
+---
+
+## Prerequisites
+
+- **Python 3.7+**  
+- **NLTK** (Natural Language Toolkit). Install with:
+  ```bash
+  pip install nltk
 ---
 
 ## Prerequisites
@@ -79,17 +87,20 @@ project-folder/
 - Maps terms to the documents in which they appear.
 - Tracks the frequency of each term in each document.
 
-### 4. Computing TF-IDF
+### 4. Weighting and Building Vectors (TF–IDF)
 
-- Calculates Term Frequency (TF) for each term in each document.
-- Calculates Inverse Document Frequency (IDF) for each term.
-- Combines TF and IDF to compute the TF-IDF score.
+-	TF can be binary, raw frequency, or log frequency (chosen via --tf).
+-	IDF can be none, standard, or probabilistic (chosen via --idf).
+-	Produces a weighted_index and doc_vectors for efficient scoring.
 
-### 5. Cosine Similarity and Searching
+### 5. Similarity and Searching
 
-- Builds a query vector using the same preprocessing and TF-IDF calculation as for documents.
-- Computes the cosine similarity between the query vector and document vectors.
-- Ranks documents based on similarity scores.
+- The user query is preprocessed and weighted (using the same TF/IDF schemes).
+- Similarity can be one of:
+	•	Cosine (--sim cosine)
+	•	Jaccard (--sim jaccard)
+	•	Dice (--sim dice)
+- Ranks documents by similarity score and returns top results.
 
 Below is a visual representation of the workflow:
 
@@ -97,31 +108,58 @@ Below is a visual representation of the workflow:
 
 ## Usage
 
-1. Place your `.txt` files in the `documents/` directory.
-2. Run the script:
+1.	Place your .txt files in the documents/ folder (or specify another folder).
 
+2.	Run the script with command-line arguments to control TF scheme, IDF scheme, similarity, etc.
+Exemple:
 ```bash
-python main.py
+python main.py \
+    --query "information retrieval" \
+    --documents "./documents" \
+    --tf l \
+    --idf t \
+    --sim cosine \
+    --topk 10
 ```
 
-3. Enter a query when prompted.
+Explanation:
+	•	--query        : The search query text.
+	•	--documents    : Path to a folder of .txt files.
+	•	--tf           : TF scheme (b, n, or l).
+	•	--idf          : IDF scheme (n, t, or p).
+	•	--sim          : Similarity measure (cosine, jaccard, or dice).
+	•	--topk         : Number of top documents to display and evaluate (default=5).
+
+
+
+3. Relevant Documents: By default, the code uses a placeholder set, e.g. {"doc_3", "doc_5", "doc_7"}.
+	•	For accurate evaluation, you should specify query-specific relevant docs. This can be done by either:
+	•	Hardcoding a dictionary mapping queries to relevant doc IDs.
+	•	Loading an external relevance-judgment file.
+	•	Update the relevant docs in main.py if needed.
 
 4. Sample Output :
 
 ```plaintext
 Loading documents from: ./documents
-Number of documents loaded: 5
+Number of documents loaded: 10
 Building inverted index...
-Computing TF-IDF...
+Building weighted index (TF='l', IDF='t')...
 
-Searching for: "example query"
-```
+Query: "information retrieval" (TF='l', IDF='t', SIM='cosine')
+Top 5 results:
+  doc_2 => 0.1174
+  doc_7 => 0.0982
+  doc_0 => 0.0761
+  doc_9 => 0.0528
+  doc_1 => 0.0443
 
-```bash
-#1 | Document ID: 12 | Score: 0.4587
-#2 | Document ID: 4  | Score: 0.3412
-#3 | Document ID: 19 | Score: 0.2975
-...
+--- Evaluation Metrics ---
+Global Precision: 0.33
+Global Recall:    0.50
+Global F1:        0.40
+P@5:              0.40
+R@5:              0.60
 ```
 
 ---
@@ -131,6 +169,8 @@ Searching for: "example query"
 - **Stopwords Language**: Change the `LANGUAGE` variable to use a different stopwords list (e.g., "french").
 - **Stemming**: Swap out the `SnowballStemmer` for a different stemming algorithm if needed.
 - **Directory Path**: Modify the `folder_path` variable in `main.py` to point to your desired directory.
+- **Relevance Judgments**: Modify or load from a file to reflect actual relevant docs for each query.
+- **Additional Similarity Metrics**: You can add more advanced similarity measures if desired.
 
 ---
 
