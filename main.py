@@ -112,7 +112,7 @@ def compute_tf_idf(inverted_index, total_docs):
         idf = math.log((total_docs + 1) / df)
 
         for doc_id, tf in postings.items():
-            tf_idf_value = tf * idf  # Rename this variable to avoid overwriting the dictionary
+            tf_idf_value = tf * idf
             tf_idf_index[term][doc_id] = tf_idf_value
             doc_vectors[doc_id][term] = tf_idf_value
 
@@ -234,7 +234,7 @@ if __name__ == "__main__":
 
     # 4) Process query from terminal
     user_query = args.query
-    relevant_docs = {"doc_3", "doc_5", "doc_7"}
+    relevant_docs = {"doc_6", "doc_71", "doc_41"}
     print(f"\nSearching for: \"{user_query}\"")
     results = search(user_query, tf_idf_idx, doc_vectors)
 
@@ -243,7 +243,10 @@ if __name__ == "__main__":
     for doc_id, score in results[:5]:
         print(f"  DocID={doc_id}, Score={score:.4f}")
 
+    print("Results:", results)
+    print("Relevant Docs:", relevant_docs)
+
     # Evaluate the results
-    precision, recall = evaluate_precision_recall(results, relevant_docs)
+    precision, recall = evaluate_precision_recall(results[:5], relevant_docs)
     print(f"\nPrecision: {precision:.2f}")
     print(f"Recall: {recall:.2f}")
