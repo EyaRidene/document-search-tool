@@ -1,11 +1,12 @@
 import os
 import math
 import nltk
+import argparse
 from collections import defaultdict
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
 
-LANGUAGE = "english"  #"french", "english", etc.
+LANGUAGE = "english"  # "french", "english", etc.
 STOPWORDS = set(stopwords.words(LANGUAGE))
 
 STEMMER = SnowballStemmer(LANGUAGE)
@@ -117,9 +118,6 @@ def compute_tf_idf(inverted_index, total_docs):
 
     return tf_idf_index, doc_vectors
 
-
-import math
-
 ######################################
 # 5. Cosine Similarity Search
 ######################################
@@ -141,9 +139,8 @@ def cosine_similarity(q_vec, d_vec):
     
     return dot / (q_norm * d_norm)
 
-
 ######################################
-# 5. Apply Search
+# 6. Apply Search
 ######################################
 
 def search(query, tf_idf_index, doc_vectors):
@@ -168,7 +165,7 @@ def search(query, tf_idf_index, doc_vectors):
         if term in tf_idf_index:
             df = len(tf_idf_index[term])
             if df > 0:
-                idf = math.log2((total_docs + 1) / df)
+                idf = math.log((total_docs + 1) / df)
                 query_vector[term] = freq * idf
         else:
             query_vector[term] = 0.0
@@ -184,10 +181,41 @@ def search(query, tf_idf_index, doc_vectors):
     return ranked_docs
 
 ######################################
-# 6. Main Demo
+# 7. Evaluate
+######################################
+
+def evaluate_precision_recall(results, relevant_docs):
+    """
+    Calculate precision and recall based on the retrieved results and relevant documents.
+    
+    Args:
+        results (list of tuples): Ranked list of results [(doc_id, score), ...].
+        relevant_docs (set): Set of relevant document IDs for the query.
+    
+    Returns:
+        tuple: Precision and Recall as floats.
+    """
+    if not results:
+        return 0.0, 0.0
+
+    retrieved_docs = [doc_id for doc_id, _ in results]
+    retrieved_set = set(retrieved_docs)
+    relevant_retrieved = retrieved_set & relevant_docs
+
+    precision = len(relevant_retrieved) / len(retrieved_docs) if retrieved_docs else 0
+    recall = len(relevant_retrieved) / len(relevant_docs) if relevant_docs else 0
+
+    return precision, recall
+
+######################################
+# 8. Main Demo
 ######################################
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Search and Evaluate Precision and Recall.")
+    parser.add_argument("query", type=str, help="The search query string.")
+    args = parser.parse_args()
+
     folder_path = "./documents"
 
     # 1) Load documents
@@ -204,12 +232,18 @@ if __name__ == "__main__":
     N = len(docs)
     tf_idf_idx, doc_vectors = compute_tf_idf(inverted_idx, N)
 
-    # 4) Do a sample query
-    user_query = "example query"
+    # 4) Process query from terminal
+    user_query = args.query
+    relevant_docs = {"doc_3", "doc_5", "doc_7"}
     print(f"\nSearching for: \"{user_query}\"")
     results = search(user_query, tf_idf_idx, doc_vectors)
-    
-    # Print top 5
+
+    # Print top 5 results
     print("Top 5 results:")
     for doc_id, score in results[:5]:
         print(f"  DocID={doc_id}, Score={score:.4f}")
+
+    # Evaluate the results
+    precision, recall = evaluate_precision_recall(results, relevant_docs)
+    print(f"\nPrecision: {precision:.2f}")
+    print(f"Recall: {recall:.2f}")
