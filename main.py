@@ -6,14 +6,16 @@ from collections import defaultdict
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
 
-LANGUAGE = "english"  # "french", "english", etc.
+# -------------------------------------------------
+# Configuration
+# -------------------------------------------------
+LANGUAGE = "english"  # or "french", etc.
 STOPWORDS = set(stopwords.words(LANGUAGE))
-
 STEMMER = SnowballStemmer(LANGUAGE)
 
-######################################
+# -------------------------------------------------
 # 1. Read documents
-######################################
+# -------------------------------------------------
 
 def load_documents_from_directory(directory_path):
     """
@@ -36,9 +38,9 @@ def load_documents_from_directory(directory_path):
                 doc_id += 1
     return documents
 
-######################################
+# -------------------------------------------------
 # 2. Preprocessing
-######################################
+# -------------------------------------------------
 
 def preprocess_text(text):
     """
@@ -64,9 +66,9 @@ def preprocess_text(text):
 
     return stemmed_tokens
 
-######################################
+# -------------------------------------------------
 # 3. Build Inverted Index
-######################################
+# -------------------------------------------------
 
 def build_inverted_index(documents):
     """
@@ -94,60 +96,153 @@ def build_inverted_index(documents):
 
     return index_inverted
 
-######################################
-# 4. Compute TF-IDF
-######################################
+# -------------------------------------------------
+# 4. Weighting (TF & IDF)
+# -------------------------------------------------
 
-def compute_tf_idf(inverted_index, total_docs):
+def compute_tf(tf_scheme, raw_freq):
+    """
+    Computes the TF according to user choice (tf_scheme).
+    tf_scheme can be:
+      - 'b': binary
+      - 'n': raw frequency
+      - 'l': log frequency
+    """
+    if raw_freq == 0:
+        return 0
+    if tf_scheme == 'b':
+        return 1
+    elif tf_scheme == 'l':
+        return 1 + math.log(raw_freq, 10)
+    # default: 'n'
+    return raw_freq
+
+def compute_idf(idf_scheme, df, total_docs):
+    """
+    Computes the IDF according to user choice (idf_scheme).
+    idf_scheme can be:
+      - 'n': none (always 1)
+      - 't': standard ( log((N+1)/df) )
+      - 'p': probabilistic ( log((N - df) / df) )
+    """
+    if df == 0:
+        return 0
+
+    if idf_scheme == 'n':
+        return 1.0
+    elif idf_scheme == 'p':
+        # Avoid division by zero:
+        if df == total_docs:
+            # log((N-df)/df) would be log(0), we keep it minimal
+            return 0
+        return math.log((total_docs - df) / df, 10)
+    # default: 't'
+    # log((N+1)/df)
+    return math.log((total_docs + 1) / df, 10)
+
+def build_weighted_index(inverted_index, total_docs, tf_scheme='n', idf_scheme='t'):
     """
     Returns two structures:
-    1) tf_idf_index = { term: { doc_id: tf_idf_value }, ... }
-    2) doc_vectors = { doc_id: { term: tf_idf_value, ... }, ... } (for easier searching)
+    1) weighted_index = { term: { doc_id: tf*idf }, ... }
+    2) doc_vectors = { doc_id: { term: tf*idf, ... }, ... } (for easier searching)
+    
+    We compute the TF-IDF (or variations) as (TF * IDF).
     """
-    tf_idf_index = defaultdict(dict)
+    weighted_index = defaultdict(dict)
     doc_vectors = defaultdict(dict)
 
     for term, postings in inverted_index.items():
         df = len(postings)
-        idf = math.log((total_docs + 1) / df)
+        idf_value = compute_idf(idf_scheme, df, total_docs)
 
         for doc_id, tf in postings.items():
-            tf_idf_value = tf * idf
+            tf_idf_value = tf * idf  # Rename this variable to avoid overwriting the dictionary
             tf_idf_index[term][doc_id] = tf_idf_value
             doc_vectors[doc_id][term] = tf_idf_value
 
-    return tf_idf_index, doc_vectors
+    return weighted_index, doc_vectors
 
-######################################
-# 5. Cosine Similarity Search
-######################################
+# -------------------------------------------------
+# 5. Similarity Functions
+# -------------------------------------------------
 
-def cosine_similarity(q_vec, d_vec):
-    # 1) dot product
-    dot = 0.0
+def similarity_cosine(q_vec, d_vec):
+    """
+    Cosine similarity = dot(q,d) / (||q|| * ||d||).
+    """
+    # Dot product
+    dot_product = 0.0
     for term, q_weight in q_vec.items():
         d_weight = d_vec.get(term, 0.0)
-        dot += q_weight * d_weight
+        dot_product += q_weight * d_weight
     
-    # 2) norms
-    q_norm = math.sqrt(sum(v * v for v in q_vec.values()))
-    d_norm = math.sqrt(sum(v * v for v in d_vec.values()))
+    # Norms
+    q_norm = math.sqrt(sum(v**2 for v in q_vec.values()))
+    d_norm = math.sqrt(sum(v**2 for v in d_vec.values()))
     
-    # 3) avoid division by zero
     if q_norm == 0 or d_norm == 0:
         return 0.0
     
-    return dot / (q_norm * d_norm)
+    return dot_product / (q_norm * d_norm)
 
-######################################
-# 6. Apply Search
-######################################
-
-def search(query, tf_idf_index, doc_vectors):
+def similarity_jaccard(q_vec, d_vec):
     """
+    Jaccard similarity = |Q ∩ D| / |Q ∪ D|.
+    In a weighted context, a typical adaptation is:
+       sum(min(q_vec[term], d_vec[term])) / sum(max(q_vec[term], d_vec[term])).
+    """
+    all_terms = set(q_vec.keys()) | set(d_vec.keys())
+    numerator = 0.0
+    denominator = 0.0
+
+    for term in all_terms:
+        q_w = q_vec.get(term, 0.0)
+        d_w = d_vec.get(term, 0.0)
+        numerator += min(q_w, d_w)
+        denominator += max(q_w, d_w)
+    
+    if denominator == 0:
+        return 0.0
+    
+    return numerator / denominator
+
+def similarity_dice(q_vec, d_vec):
+    """
+    Dice similarity = (2 * |Q ∩ D|) / (|Q| + |D|).
+    Weighted adaptation:
+       2 * sum(min(q_vec[term], d_vec[term])) / (sum(q_vec.values()) + sum(d_vec.values())).
+    """
+    numerator = 0.0
+    for term in set(q_vec.keys()) & set(d_vec.keys()):
+        numerator += min(q_vec[term], d_vec[term])
+    denominator = sum(q_vec.values()) + sum(d_vec.values())
+
+    if denominator == 0:
+        return 0.0
+    
+    return (2.0 * numerator) / denominator
+
+def get_similarity_function(sim_name):
+    """
+    Returns the appropriate similarity function given sim_name.
+    """
+    if sim_name == 'jaccard':
+        return similarity_jaccard
+    elif sim_name == 'dice':
+        return similarity_dice
+    # default: cosine
+    return similarity_cosine
+
+# -------------------------------------------------
+# 6. Apply Search
+# -------------------------------------------------
+
+def search(query, weighted_index, doc_vectors, tf_scheme, idf_scheme, sim_name):
+    """
+    Steps:
     - Preprocess the 'query' string
-    - Build a TF-IDF vector for the query
-    - Calculate cosine similarity with each doc
+    - Build a query TF/IDF vector based on the chosen scheme
+    - Calculate similarity with each doc (based on the chosen similarity metric)
     - Return sorted doc_ids with their similarity scores
     """
     # 1) Preprocess query
@@ -158,31 +253,41 @@ def search(query, tf_idf_index, doc_vectors):
     for t in query_tokens:
         query_frequencies[t] += 1
 
-    # 3) Build a TF-IDF vector for the query
+    # 3) Build a vector for the query
     query_vector = {}
     total_docs = len(doc_vectors)
+    
+    # For each term in the query, compute TF * IDF according to chosen scheme
     for term, freq in query_frequencies.items():
-        if term in tf_idf_index:
-            df = len(tf_idf_index[term])
-            if df > 0:
-                idf = math.log((total_docs + 1) / df)
-                query_vector[term] = freq * idf
+        # compute TF for query
+        tf_value = compute_tf(tf_scheme, freq)
+        
+        # compute IDF (if the term is known in the index)
+        if term in weighted_index:
+            df = len(weighted_index[term])
         else:
-            query_vector[term] = 0.0
+            df = 0
+        
+        idf_value = compute_idf(idf_scheme, df, total_docs)
+        
+        query_vector[term] = tf_value * idf_value
+
+    # 4) Get the chosen similarity function
+    similarity_func = get_similarity_function(sim_name)
 
     # 5) Calculate similarities with each document
     scores = {}
     for doc_id, doc_vec in doc_vectors.items():
-        score = cosine_similarity(query_vector, doc_vec)
+        score = similarity_func(query_vector, doc_vec)
         scores[doc_id] = score
 
     # 6) Sort by score descending
     ranked_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     return ranked_docs
 
-######################################
+# -------------------------------------------------
 # 7. Evaluate
-######################################
+# -------------------------------------------------
 
 def evaluate_precision_recall(results, relevant_docs):
     """
@@ -193,7 +298,7 @@ def evaluate_precision_recall(results, relevant_docs):
         relevant_docs (set): Set of relevant document IDs for the query.
     
     Returns:
-        tuple: Precision and Recall as floats.
+        tuple: (precision, recall)
     """
     if not results:
         return 0.0, 0.0
@@ -207,34 +312,42 @@ def evaluate_precision_recall(results, relevant_docs):
 
     return precision, recall
 
-######################################
+# -------------------------------------------------
 # 8. Main Demo
-######################################
+# -------------------------------------------------
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Search and Evaluate Precision and Recall.")
-    parser.add_argument("query", type=str, help="The search query string.")
+    parser.add_argument("--query", type=str, required=True, help="The search query string.")
+    parser.add_argument("--documents", type=str, default="./documents", 
+                        help="Folder containing .txt documents.")
+    parser.add_argument("--tf", type=str, default='n', choices=['b','n','l'],
+                        help="TF weighting scheme: b=Binary, n=Raw freq, l=Log freq.")
+    parser.add_argument("--idf", type=str, default='t', choices=['n','t','p'],
+                        help="IDF weighting scheme: n=None, t=Standard, p=Probabilistic.")
+    parser.add_argument("--sim", type=str, default='cosine', choices=['cosine','jaccard','dice'],
+                        help="Similarity measure.")
     args = parser.parse_args()
 
-    folder_path = "./documents"
-
     # 1) Load documents
-    print(f"Loading documents from: {folder_path}")
-    docs = load_documents_from_directory(folder_path)
+    print(f"Loading documents from: {args.documents}")
+    docs = load_documents_from_directory(args.documents)
     print(f"Number of documents loaded: {len(docs)}")
 
     # 2) Build inverted index
     print("Building inverted index...")
     inverted_idx = build_inverted_index(docs)
 
-    # 3) Compute TF-IDF
-    print("Computing TF-IDF...")
+    # 3) Build Weighted Index (TF x IDF)
+    print(f"Building weighted index using TF='{args.tf}', IDF='{args.idf}'")
     N = len(docs)
-    tf_idf_idx, doc_vectors = compute_tf_idf(inverted_idx, N)
+    weighted_idx, doc_vectors = build_weighted_index(inverted_idx, N, 
+                                                     tf_scheme=args.tf, 
+                                                     idf_scheme=args.idf)
 
-    # 4) Process query from terminal
+    # 4) Process query
     user_query = args.query
-    relevant_docs = {"doc_6", "doc_71", "doc_41"}
+    relevant_docs = {"doc_3", "doc_5", "doc_7"}
     print(f"\nSearching for: \"{user_query}\"")
     results = search(user_query, tf_idf_idx, doc_vectors)
 
