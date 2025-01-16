@@ -111,11 +111,12 @@ def compute_tf_idf(inverted_index, total_docs):
         idf = math.log((total_docs + 1) / df)
 
         for doc_id, tf in postings.items():
-            tf_idf = tf * idf
-            tf_idf[term][doc_id] = tf_idf
-            doc_vectors[doc_id][term] = tf_idf
+            tf_idf_value = tf * idf  # Rename this variable to avoid overwriting the dictionary
+            tf_idf_index[term][doc_id] = tf_idf_value
+            doc_vectors[doc_id][term] = tf_idf_value
 
     return tf_idf_index, doc_vectors
+
 
 import math
 
