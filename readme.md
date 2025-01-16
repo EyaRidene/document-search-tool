@@ -60,60 +60,6 @@ project-folder/
 
 ---
 
-# TF-IDF Search Engine Project
-
-This project is a Python-based search engine that allows users to query a set of documents using TF-IDF (Term Frequency-Inverse Document Frequency) and cosine similarity. Below is a detailed description of the implementation.
-
----
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Project Structure](#project-structure)
-3. [How It Works](#how-it-works)
-   1. [1. Reading Documents](#1-reading-documents)
-   2. [2. Preprocessing](#2-preprocessing)
-   3. [3. Building the Inverted Index](#3-building-the-inverted-index)
-   4. [4. Computing TF-IDF](#4-computing-tf-idf)
-   5. [5. Cosine Similarity and Searching](#5-cosine-similarity-and-searching)
-   6. [6. Main Demo](#6-main-demo)
-4. [Usage](#usage)
-5. [Customization](#customization)
-6. [Possible Improvements](#possible-improvements)
-7. [License](#license)
-
----
-
-## Prerequisites
-
-Ensure the following Python libraries are installed:
-
-- `nltk`
-- `os` (standard library)
-- `math` (standard library)
-- `collections` (standard library)
-
-Additionally, download the necessary NLTK data:
-
-```python
-import nltk
-nltk.download('punkt')
-nltk.download('stopwords')
-```
-
----
-
-## Project Structure
-
-```plaintext
-project-folder/
-├── documents/               # Directory containing .txt files
-├── main.py                  # Main script
-├── README.md                # Documentation
-```
-
----
-
 ## How It Works
 
 ### 1. Reading Documents
@@ -145,7 +91,9 @@ project-folder/
 - Computes the cosine similarity between the query vector and document vectors.
 - Ranks documents based on similarity scores.
 
----
+Below is a visual representation of the workflow:
+
+## ![Workflow Diagram](./images/workflow.png)
 
 ## Usage
 
